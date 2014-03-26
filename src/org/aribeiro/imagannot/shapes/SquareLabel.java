@@ -16,8 +16,9 @@ import javax.swing.border.Border;
  */
 public class SquareLabel extends CommonLabel {
 
-    public SquareLabel(String text, Color bgColor, Color textColor, Border border) {
-        super(text, bgColor, textColor, border, new Dimension(20, 20));
+    public SquareLabel(String text, Color bgColor, Color textColor, Border border, Dimension dim) {
+//        super(text, bgColor, textColor, border, new Dimension(20, 20));
+        super(text, bgColor, textColor, border, dim);
     }
 
     

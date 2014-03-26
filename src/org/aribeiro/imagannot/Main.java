@@ -5,17 +5,16 @@
  */
 package org.aribeiro.imagannot;
 
-import org.aribeiro.imagannot.shapes.RoundLabel;
-import org.aribeiro.imagannot.shapes.SquareLabel;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
@@ -26,13 +25,17 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
 import javax.swing.JColorChooser;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
+import javax.swing.JOptionPane;
 import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableModel;
+import org.aribeiro.imagannot.shapes.RoundLabel;
+import org.aribeiro.imagannot.shapes.SquareLabel;
 import org.aribeiro.imagannot.utils.ImageExporter;
 
 /**
@@ -42,20 +45,58 @@ import org.aribeiro.imagannot.utils.ImageExporter;
 public class Main extends javax.swing.JFrame {
 
     enum AnnotationShape {
-
         SQUARE,
         ROUND;
+    }
+    
+    enum AnnotationSize {
+        SMALL(11, 6.0f, "Small"),
+        MEDIUM(21, 12.0f, "Medium"),
+        LARGE(41, 24.0f, "Large");
+        
+        private final int size;
+        private final float fontSize;
+        private final String name;
+        
+        AnnotationSize(int size, float fontSize, String name) { 
+            this.size = size; 
+            this.fontSize = fontSize;
+            this.name = name;
+        }
+        
+        public int getValue() { 
+            return size; 
+        }
+        
+        public float getFontSize() {
+            return fontSize;
+        }
+        
+        public String getName() {
+            return name;
+        }
+        
+        public static String[] names() {
+            AnnotationSize[] annoSizes = values();
+            String[] names = new String[annoSizes.length];
+
+            for (int i = 0; i < annoSizes.length; i++) {
+                names[i] = annoSizes[i].getName();
+            }
+
+            return names;
+        }
     }
 
     private final Map<Integer, JLabel> jlabelMap = new HashMap<>();
 
     private static int count = 0;
-
+    
     private Color labelBackground = Color.WHITE;
     private Color labelLetterColor = Color.BLACK;
     private Color labelBorderColor = Color.BLACK;
-    private AnnotationShape annotationShape = AnnotationShape.SQUARE;
-
+    private AnnotationShape annotationShape = AnnotationShape.ROUND;
+    
     /**
      * Creates new form Main
      */
@@ -78,10 +119,11 @@ public class Main extends javax.swing.JFrame {
         colorChooser = new javax.swing.JColorChooser();
         annotationShapeGroup = new javax.swing.ButtonGroup();
         mainPanel = new javax.swing.JPanel();
+        imageScrollPane = new javax.swing.JScrollPane();
         imagePanel = new javax.swing.JPanel();
         imageLayeredPanel = new javax.swing.JLayeredPane();
         imageLabel = new javax.swing.JLabel();
-        jScrollPane2 = new javax.swing.JScrollPane();
+        propertiesTableScrollPanel = new javax.swing.JScrollPane();
         table = new javax.swing.JTable();
         jToolBar1 = new javax.swing.JToolBar();
         squareShapeRadioButton = new javax.swing.JRadioButton();
@@ -89,7 +131,9 @@ public class Main extends javax.swing.JFrame {
         backgroundSelectButton = new javax.swing.JButton();
         letterColorSelectButton = new javax.swing.JButton();
         borderColorSelectButton = new javax.swing.JButton();
+        annotationSizeComboBox = new javax.swing.JComboBox();
         deleteAnnotationButton = new javax.swing.JButton();
+        deleteAllBtn = new javax.swing.JButton();
         topMenu = new javax.swing.JMenuBar();
         fileMenu = new javax.swing.JMenu();
         loadFromDiskMenuOption = new javax.swing.JMenuItem();
@@ -116,15 +160,21 @@ public class Main extends javax.swing.JFrame {
         imageLayeredPanel.setLayout(imageLayeredPanelLayout);
         imageLayeredPanelLayout.setHorizontalGroup(
             imageLayeredPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(imageLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 263, Short.MAX_VALUE)
+            .addGap(0, 398, Short.MAX_VALUE)
+            .addGroup(imageLayeredPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(imageLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 398, Short.MAX_VALUE))
         );
         imageLayeredPanelLayout.setVerticalGroup(
             imageLayeredPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(imageLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 360, Short.MAX_VALUE)
+            .addGap(0, 390, Short.MAX_VALUE)
+            .addGroup(imageLayeredPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(imageLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 390, Short.MAX_VALUE))
         );
         imageLayeredPanel.setLayer(imageLabel, javax.swing.JLayeredPane.DEFAULT_LAYER);
 
         imagePanel.add(imageLayeredPanel);
+
+        imageScrollPane.setViewportView(imagePanel);
 
         table.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
@@ -153,7 +203,7 @@ public class Main extends javax.swing.JFrame {
             }
         });
         table.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        jScrollPane2.setViewportView(table);
+        propertiesTableScrollPanel.setViewportView(table);
 
         jToolBar1.setFloatable(false);
 
@@ -218,10 +268,31 @@ public class Main extends javax.swing.JFrame {
         });
         jToolBar1.add(borderColorSelectButton);
 
+        annotationSizeComboBox.setModel(new DefaultComboBoxModel(AnnotationSize.values()));
+        annotationSizeComboBox.setMaximumSize(new java.awt.Dimension(100, 20));
+        annotationSizeComboBox.addActionListener (new ActionListener () {
+            public void actionPerformed(ActionEvent e) {
+                resizeAnnotations();
+            }
+        });
+        jToolBar1.add(annotationSizeComboBox);
+
         deleteAnnotationButton.setText("Delete");
+
+        binding = org.jdesktop.beansbinding.Bindings.createAutoBinding(org.jdesktop.beansbinding.AutoBinding.UpdateStrategy.READ_WRITE, table, org.jdesktop.beansbinding.ELProperty.create("${enabled}"), deleteAnnotationButton, org.jdesktop.beansbinding.BeanProperty.create("enabled"));
+        bindingGroup.addBinding(binding);
+
         deleteAnnotationButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 deleteAnnotationButtonActionPerformed(evt);
+            }
+        });
+
+        deleteAllBtn.setText("Delete All");
+        deleteAllBtn.setEnabled(false);
+        deleteAllBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                deleteAllBtnActionPerformed(evt);
             }
         });
 
@@ -229,14 +300,15 @@ public class Main extends javax.swing.JFrame {
         mainPanel.setLayout(mainPanelLayout);
         mainPanelLayout.setHorizontalGroup(
             mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, 589, Short.MAX_VALUE)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, mainPanelLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(imagePanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(imageScrollPane)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 157, Short.MAX_VALUE)
-                    .addComponent(deleteAnnotationButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(propertiesTableScrollPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 157, Short.MAX_VALUE)
+                    .addComponent(deleteAnnotationButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(deleteAllBtn, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         mainPanelLayout.setVerticalGroup(
@@ -246,12 +318,13 @@ public class Main extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(mainPanelLayout.createSequentialGroup()
-                        .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                        .addComponent(propertiesTableScrollPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 280, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
+                        .addComponent(deleteAnnotationButton)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(deleteAnnotationButton))
-                    .addGroup(mainPanelLayout.createSequentialGroup()
-                        .addComponent(imagePanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addContainerGap())))
+                        .addComponent(deleteAllBtn)
+                        .addContainerGap())
+                    .addComponent(imageScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 391, Short.MAX_VALUE)))
         );
 
         getContentPane().add(mainPanel, java.awt.BorderLayout.CENTER);
@@ -308,51 +381,27 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_loadFromDiskMenuOptionActionPerformed
 
-    private void backgroundSelectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_backgroundSelectButtonActionPerformed
-        // TODO add your handling code here:
-        Color showDialog = JColorChooser.showDialog(this, "", labelBackground);
-        if (showDialog != null) {
-            labelBackground = showDialog;
-        }
-    }//GEN-LAST:event_backgroundSelectButtonActionPerformed
-
-    private void letterColorSelectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_letterColorSelectButtonActionPerformed
-        // TODO add your handling code here:
-        Color showDialog = JColorChooser.showDialog(this, "", labelLetterColor);
-        if (showDialog != null) {
-            labelLetterColor = showDialog;
-        }
-    }//GEN-LAST:event_letterColorSelectButtonActionPerformed
-
-    private void borderColorSelectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_borderColorSelectButtonActionPerformed
-        // TODO add your handling code here:
-        Color showDialog = JColorChooser.showDialog(this, "", labelBorderColor);
-        if (showDialog != null) {
-            labelBorderColor = showDialog;
-        }
-    }//GEN-LAST:event_borderColorSelectButtonActionPerformed
-
     private void exportToDiskMenuOptionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exportToDiskMenuOptionActionPerformed
-        // TODO add your handling code here:
         int showSaveDialog = fileChooser.showSaveDialog(this);
 
         if (JFileChooser.APPROVE_OPTION == showSaveDialog) {
             String absolutePath = fileChooser.getSelectedFile().getAbsolutePath();
-            ImageExporter.savePanelAsImage(imagePanel, absolutePath);
+            ImageExporter.savePanelAsImage(imageLayeredPanel, absolutePath);
         }
     }//GEN-LAST:event_exportToDiskMenuOptionActionPerformed
 
-    private void addAnnotation(String labelStr, int x, int y) {
-
-        //final JLabel label = new JLabel(labelStr);
+    private void addAnnotation(String labelStr, int x, int y, Dimension dim) {
         final JLabel label;
-
+        final float fontSize = ((AnnotationSize)annotationSizeComboBox.getSelectedItem()).getFontSize();
+        
         if (annotationShape == AnnotationShape.SQUARE) {
-            label = new SquareLabel(labelStr, labelBackground, labelLetterColor, new LineBorder(labelBorderColor));
+            label = new SquareLabel(labelStr, labelBackground, labelLetterColor, new LineBorder(labelBorderColor), dim);
         } else {
-            label = new RoundLabel(labelStr, labelBackground, labelLetterColor);
+            label = new RoundLabel(labelStr, labelBackground, labelLetterColor, dim);
         }
-
+        
+        resizeFont(label, fontSize);
+        
         imageLayeredPanel.add(label, JLayeredPane.DRAG_LAYER);
         label.setLocation(x, y);
 
@@ -380,61 +429,28 @@ public class Main extends javax.swing.JFrame {
             public void mouseMoved(MouseEvent e) {
             }
         });
+        
+        //enable deleteAllBtn
+        deleteAllBtn.setEnabled(true);
     }
 
-    private void imageLayeredPanelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_imageLayeredPanelMouseClicked
-        count++;
-        addAnnotation(count + "", evt.getX(), evt.getY());
-
-    }//GEN-LAST:event_imageLayeredPanelMouseClicked
-
-    private void deleteAnnotationButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteAnnotationButtonActionPerformed
-        // TODO add your handling code here:
-        DefaultTableModel model = (DefaultTableModel) table.getModel();
-        int selectedRow = table.getSelectedRow();
-
-        String value = model.getValueAt(selectedRow, 0).toString();
-
-        int intValueToRemove = Integer.valueOf(value);
-        
-        model.removeRow(selectedRow);
-        JLabel labelToRemove = jlabelMap.remove(intValueToRemove);
-        Container parent = labelToRemove.getParent();
-        
-        boolean hasNext = true;
-        
-        do {
-            
-            intValueToRemove++;
-            
-            if (jlabelMap.containsKey(intValueToRemove)) {
-                
-                JLabel label = jlabelMap.get(intValueToRemove);
-                
-                int newIntValue = intValueToRemove - 1;
-                String newStringValue = String.valueOf(intValueToRemove - 1);
-                
-                label.setText(newStringValue);
-                jlabelMap.put(newIntValue, label);
-                
-            } else {
-                hasNext = false;
-            }
-            
-        } while(hasNext);
-        
-        count--;
-        jlabelMap.remove(intValueToRemove - 1);
-        
-        
-        updateTable();
-        parent.remove(labelToRemove);
-        parent.validate();
-        parent.repaint();
-
-
-    }//GEN-LAST:event_deleteAnnotationButtonActionPerformed
-
+    private void resizeFont(JLabel label, float fontSize){
+        label.setFont(label.getFont().deriveFont(fontSize));
+    }
+    
+    private void resizeAnnotations(){
+        AnnotationSize selectedSize = (AnnotationSize)annotationSizeComboBox.getSelectedItem();
+        int size = selectedSize.getValue();
+        float fontSize = selectedSize.getFontSize();
+        Dimension dim = new Dimension(size, size);
+        for(JLabel label : jlabelMap.values()){
+            resizeFont(label, fontSize);
+            label.setSize(dim);
+            label.validate();
+            label.repaint();
+        }
+    }
+    
     private void updateTable() {
         DefaultTableModel model = new DefaultTableModel(new String[]{"key", "value"}, 0);
         
@@ -446,14 +462,6 @@ public class Main extends javax.swing.JFrame {
         
     }
     
-    private void squareShapeRadioButtonStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_squareShapeRadioButtonStateChanged
-        defineShape();
-    }//GEN-LAST:event_squareShapeRadioButtonStateChanged
-
-    private void roundShapeRadioButtonStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_roundShapeRadioButtonStateChanged
-        defineShape();
-    }//GEN-LAST:event_roundShapeRadioButtonStateChanged
-
     private void loadFromClipboardMenuOptionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadFromClipboardMenuOptionActionPerformed
         BufferedImage imageFromClipboard = getImageFromClipboard();
         if (imageFromClipboard != null) {
@@ -461,6 +469,120 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_loadFromClipboardMenuOptionActionPerformed
 
+    private void deleteAnnotationButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteAnnotationButtonActionPerformed
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        if(model.getRowCount() > 0) {
+            int selectedRow = table.getSelectedRow();
+
+            String value = model.getValueAt(selectedRow, 0).toString();
+
+            int intValueToRemove = Integer.valueOf(value);
+
+            model.removeRow(selectedRow);
+            JLabel labelToRemove = jlabelMap.remove(intValueToRemove);
+            Container parent = labelToRemove.getParent();
+
+            boolean hasNext = true;
+
+            do {
+
+                intValueToRemove++;
+
+                if (jlabelMap.containsKey(intValueToRemove)) {
+
+                    JLabel label = jlabelMap.get(intValueToRemove);
+
+                    int newIntValue = intValueToRemove - 1;
+                    String newStringValue = String.valueOf(intValueToRemove - 1);
+
+                    label.setText(newStringValue);
+                    jlabelMap.put(newIntValue, label);
+
+                } else {
+                    hasNext = false;
+                }
+
+            } while(hasNext);
+
+            count--;
+            jlabelMap.remove(intValueToRemove - 1);
+
+            updateTable();
+            parent.remove(labelToRemove);
+            deleteAllBtn.setEnabled(count > 0);
+            parent.validate();
+            parent.repaint();
+        } 
+    }//GEN-LAST:event_deleteAnnotationButtonActionPerformed
+
+    private void borderColorSelectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_borderColorSelectButtonActionPerformed
+        // TODO add your handling code here:
+        Color showDialog = JColorChooser.showDialog(this, "", labelBorderColor);
+        if (showDialog != null) {
+            labelBorderColor = showDialog;
+        }
+    }//GEN-LAST:event_borderColorSelectButtonActionPerformed
+
+    private void letterColorSelectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_letterColorSelectButtonActionPerformed
+        // TODO add your handling code here:
+        Color showDialog = JColorChooser.showDialog(this, "", labelLetterColor);
+        if (showDialog != null) {
+            labelLetterColor = showDialog;
+        }
+    }//GEN-LAST:event_letterColorSelectButtonActionPerformed
+
+    private void backgroundSelectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_backgroundSelectButtonActionPerformed
+        // TODO add your handling code here:
+        Color showDialog = JColorChooser.showDialog(this, "", labelBackground);
+        if (showDialog != null) {
+            labelBackground = showDialog;
+        }
+    }//GEN-LAST:event_backgroundSelectButtonActionPerformed
+
+    private void roundShapeRadioButtonStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_roundShapeRadioButtonStateChanged
+        defineShape();
+    }//GEN-LAST:event_roundShapeRadioButtonStateChanged
+
+    private void squareShapeRadioButtonStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_squareShapeRadioButtonStateChanged
+        defineShape();
+    }//GEN-LAST:event_squareShapeRadioButtonStateChanged
+
+    private void imageLayeredPanelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_imageLayeredPanelMouseClicked
+        count++;
+        int size = ((AnnotationSize)annotationSizeComboBox.getSelectedItem()).getValue();
+        addAnnotation(count + "", 
+                evt.getX(), evt.getY(), 
+                new Dimension(size, size));
+    }//GEN-LAST:event_imageLayeredPanelMouseClicked
+
+    private void deleteAllBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteAllBtnActionPerformed
+        int dialogResult = JOptionPane.showConfirmDialog (imageLayeredPanel, "Are you sure you want to delete all annotations?","Warning", JOptionPane.YES_NO_OPTION);
+        
+        if(dialogResult == JOptionPane.YES_OPTION){
+            deleteAllAnnotations();
+        }
+        
+        //update gui
+        deleteAllBtn.setEnabled(false);
+        imageLayeredPanel.validate();
+        imageLayeredPanel.repaint();
+    }//GEN-LAST:event_deleteAllBtnActionPerformed
+
+    private void deleteAllAnnotations() {
+        //delete all table rows
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        model.setRowCount(0);
+        
+        //delete all labels
+        for(JLabel label : jlabelMap.values()){
+            imageLayeredPanel.remove(label);
+        }
+        jlabelMap.clear();
+        
+        //reset label counter
+        count = 0;
+    }
+    
     private void defineShape() {
         annotationShape = squareShapeRadioButton.isSelected() ? AnnotationShape.SQUARE : AnnotationShape.ROUND;
     }
@@ -479,20 +601,7 @@ public class Main extends javax.swing.JFrame {
     }
 
     private void loadImage(BufferedImage bufferedImage) {
-
-        int width = bufferedImage.getWidth();
-        int height = bufferedImage.getHeight();
-
-        Dimension imageSize = new Dimension(width, height);
-        Dimension labelSize = imageLabel.getSize();
-
-        double resizeFactor = getScaleFactorToFit(imageSize, labelSize);
-
-        Image dimg = bufferedImage.getScaledInstance(Math.round(Math.round(imageSize.getWidth() * resizeFactor)),
-                Math.round(Math.round(imageSize.getHeight() * resizeFactor)),
-                Image.SCALE_SMOOTH);
-
-        imageLabel.setIcon(new ImageIcon(dimg));
+        imageLabel.setIcon(new ImageIcon(bufferedImage));
     }
 
     public double getScaleFactorToFit(Dimension original, Dimension toFit) {
@@ -505,7 +614,6 @@ public class Main extends javax.swing.JFrame {
             double dScaleHeight = getScaleFactor(original.height, toFit.height);
 
             dScale = Math.min(dScaleHeight, dScaleWidth);
-
         }
 
         return dScale;
@@ -573,9 +681,11 @@ public class Main extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.ButtonGroup annotationShapeGroup;
+    private javax.swing.JComboBox annotationSizeComboBox;
     private javax.swing.JButton backgroundSelectButton;
     private javax.swing.JButton borderColorSelectButton;
     private javax.swing.JColorChooser colorChooser;
+    private javax.swing.JButton deleteAllBtn;
     private javax.swing.JButton deleteAnnotationButton;
     private javax.swing.JMenuItem exportToClipboardMenuOption;
     private javax.swing.JMenuItem exportToDiskMenuOption;
@@ -584,12 +694,13 @@ public class Main extends javax.swing.JFrame {
     private javax.swing.JLabel imageLabel;
     private javax.swing.JLayeredPane imageLayeredPanel;
     private javax.swing.JPanel imagePanel;
-    private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JScrollPane imageScrollPane;
     private javax.swing.JToolBar jToolBar1;
     private javax.swing.JButton letterColorSelectButton;
     private javax.swing.JMenuItem loadFromClipboardMenuOption;
     private javax.swing.JMenuItem loadFromDiskMenuOption;
     private javax.swing.JPanel mainPanel;
+    private javax.swing.JScrollPane propertiesTableScrollPanel;
     private javax.swing.JRadioButton roundShapeRadioButton;
     private javax.swing.JRadioButton squareShapeRadioButton;
     private javax.swing.JTable table;
