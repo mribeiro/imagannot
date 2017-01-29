@@ -1,0 +1,66 @@
+defaultTasks = ["clean", "createAllExecutables"]
+
+apply plugin: "java"
+apply plugin: 'edu.sc.seis.launch4j'
+
+version = "1.0"
+
+buildscript {
+    repositories {
+        maven {
+            url 'https://plugins.gradle.org/m2/'
+        }
+    }
+    dependencies {
+        classpath 'gradle.plugin.edu.sc.seis.gradle:launch4j:2.1.0'
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    compile files('./libs/absolute-layout-1.7.0_25-b15.jar')
+    compile files('./libs/beansbinding-1.2.1.jar')
+}
+
+jar {
+    from('src/main/java') {
+        include '*.properties'
+    }
+    manifest {
+        attributes("Manifest-Version": "1.0",
+                //"Created-By": vendor,
+                //"Specification-Title": appName,
+                "Specification-Version": project.version,
+                //"Specification-Vendor": vendor,
+                //"Implementation-Title": appName,
+                "Implementation-Version": project.version,
+                //"Implementation-Vendor": vendor,
+                "Main-Class": 'com.aalmeida.vcf2csv.Converter',
+                "Class-Path": configurations.compile.collect { 'lib/' + it.getName() }.join(' ')
+        )
+    }
+}
+
+launch4j {
+    mainClassName = 'org.aribeiro.imagannot.Main'
+    jar = "lib/" + project.tasks[JavaPlugin.JAR_TASK_NAME].archiveName
+    headerType = "gui"
+    dontWrapJar = false
+    jreMinVersion = project.targetCompatibility
+    bundledJre64Bit = false
+    bundledJreAsFallback = false
+    fileDescription = project.name
+    productName = project.name
+    internalName = project.name
+    version = project.version
+    textVersion = project.version
+    supportUrl = ""
+    stayAlive = false
+    restartOnCrash = false
+    downloadUrl = "http://java.com/download"
+    outfile = project.name + '.exe'
+}
